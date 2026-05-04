@@ -1,0 +1,85 @@
+# .github/workflows/build.yml
+name: Build Y2Kmeter
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:   # 允许手动触发
+
+env:
+  # 根据你的实际 CMakeLists.txt 需求，可能需要调整 JUCE_ROOT 变量名或路径
+  JUCE_ROOT: ${{ github.workspace }}/JUCE
+  BUILD_TYPE: Release
+
+jobs:
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive   # 如果 JUCE 作为子模块，这里会自动拉取，否则可以去掉
+
+      # 如果 JUCE 不是子模块，则主动下载 JUCE 框架
+      - name: Cache JUCE
+        id: cache-juce
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.JUCE_ROOT }}
+          key: juce-7.0.12   # 锁定一个稳定版本，按需修改版本号
+
+      - name: Download JUCE
+        if: steps.cache-juce.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch 7.0.12 https://github.com/juce-framework/JUCE.git ${{ env.JUCE_ROOT }}
+
+      # 配置CMake工程
+      - name: Configure CMake
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+          -DJUCE_ROOT="${{ env.JUCE_ROOT }}"
+          # 如果你的 CMakeLists.txt 通过 find_package(JUCE) 查找，可能需要加上下面这行
+          # -DCMAKE_PREFIX_PATH="${{ env.JUCE_ROOT }}"
+
+      # 编译（默认生成所有目标，包括VST3和Standalone）
+      - name: Build
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel $env:NUMBER_OF_PROCESSORS
+
+      # 打包产物（根据JUCE默认输出目录结构）
+      - name: Package artifacts
+        shell: pwsh
+        run: |
+          $artifactDir = "build/Y2Kmeter_artefacts/${{ env.BUILD_TYPE }}"
+          if (Test-Path "$artifactDir/VST3") {
+            Compress-Archive -Path "$artifactDir/VST3/*" -DestinationPath Y2Kmeter_VST3.zip
+          }
+          if (Test-Path "$artifactDir/Standalone") {
+            Compress-Archive -Path "$artifactDir/Standalone/*" -DestinationPath Y2Kmeter_Standalone.zip
+          }
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: Y2Kmeter-VST3-Windows
+          path: Y2Kmeter_VST3.zip
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: Y2Kmeter-Standalone-Windows
+          path: Y2Kmeter_Standalone.zip
+
+  # （可选）macOS 构建，若需要可取消注释
+  # build-macos:
+  #   name: Build on macOS
+  #   runs-on: macos-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     # 类似逻辑，但需注意 JUCE 在 macOS 上可能需要设置 Xcode 相关参数
+  #     ...
