@@ -56,7 +56,7 @@ Y2Kmeter
         COMPANY_NAME "iisaacbeats.cn"
         PLUGIN_MANUFACTURER_CODE Y2KM
         PLUGIN_CODE Y2Km
-        FORMATS VST3 Standalone
+        FORMATS VST3 AU Standalone
         # 本插件是纯分析表（EQ 分析仪 / LUFS / 示波器 / 频谱 / 相位 / 动态等），
         # 对应 VST3 SDK 的 Analyzer 类别，让 DAW 的 FX 分类浏览器正确归类。
         VST3_CATEGORIES "Analyzer" "Fx"
